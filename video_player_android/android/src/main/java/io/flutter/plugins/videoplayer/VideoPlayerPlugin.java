@@ -171,21 +171,41 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
           // Calculate the aspect ratio
           float aspectRatio = (float) width / height;
           
-          // Clamp aspect ratio to allowed Android range (roughly 0.42 to 2.39)
-          // Min aspect ratio is approximately 10:24 or 5:12
-          // Max aspect ratio is approximately 12:5 or 24:10
+          // Android PiP allowed range is approximately 0.42 to 2.39
           final float MIN_ASPECT_RATIO = 0.42f;
           final float MAX_ASPECT_RATIO = 2.39f;
           
-          // Adjust extreme aspect ratios
+          // Standard aspect ratios
+          final float ASPECT_RATIO_16_9 = 16f / 9f;  // ~ 1.78
+          final float ASPECT_RATIO_9_16 = 9f / 16f;  // ~ 0.56
+          
+          // Adjust extreme aspect ratios to standard values
           if (aspectRatio < MIN_ASPECT_RATIO) {
-            // Too narrow, adjust width
-            width = (int) (height * MIN_ASPECT_RATIO);
-            Log.d(TAG, "Adjusting PiP aspect ratio: too narrow, clamping to " + MIN_ASPECT_RATIO);
+            // Too narrow, use 9:16 (portrait)
+            Log.d(TAG, "Adjusting PiP aspect ratio: too narrow, using 9:16");
+            width = 9;
+            height = 16;
           } else if (aspectRatio > MAX_ASPECT_RATIO) {
-            // Too wide, adjust height
-            height = (int) (width / MAX_ASPECT_RATIO);
-            Log.d(TAG, "Adjusting PiP aspect ratio: too wide, clamping to " + MAX_ASPECT_RATIO);
+            // Too wide, use 16:9 (landscape)
+            Log.d(TAG, "Adjusting PiP aspect ratio: too wide, using 16:9");
+            width = 16;
+            height = 9;
+          } else if (aspectRatio < 1.0f) {
+            // Portrait video within allowed range, but we can optionally standardize to 9:16
+            // if it's close enough to that ratio
+            if (Math.abs(aspectRatio - ASPECT_RATIO_9_16) < 0.15f) {
+              Log.d(TAG, "Standardizing PiP aspect ratio to 9:16");
+              width = 9;
+              height = 16;
+            }
+          } else {
+            // Landscape video within allowed range, but we can optionally standardize to 16:9
+            // if it's close enough to that ratio
+            if (Math.abs(aspectRatio - ASPECT_RATIO_16_9) < 0.3f) {
+              Log.d(TAG, "Standardizing PiP aspect ratio to 16:9");
+              width = 16;
+              height = 9;
+            }
           }
           
           // Set the aspect ratio with potentially adjusted dimensions
