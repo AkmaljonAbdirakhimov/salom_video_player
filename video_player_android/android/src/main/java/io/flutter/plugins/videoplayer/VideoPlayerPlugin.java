@@ -168,14 +168,34 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
         if (width > 0 && height > 0) {
           PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
           
-          // Set the aspect ratio
-          Rational aspectRatio = new Rational(width, height);
-          builder.setAspectRatio(aspectRatio);
+          // Calculate the aspect ratio
+          float aspectRatio = (float) width / height;
+          
+          // Clamp aspect ratio to allowed Android range (roughly 0.42 to 2.39)
+          // Min aspect ratio is approximately 10:24 or 5:12
+          // Max aspect ratio is approximately 12:5 or 24:10
+          final float MIN_ASPECT_RATIO = 0.42f;
+          final float MAX_ASPECT_RATIO = 2.39f;
+          
+          // Adjust extreme aspect ratios
+          if (aspectRatio < MIN_ASPECT_RATIO) {
+            // Too narrow, adjust width
+            width = (int) (height * MIN_ASPECT_RATIO);
+            Log.d(TAG, "Adjusting PiP aspect ratio: too narrow, clamping to " + MIN_ASPECT_RATIO);
+          } else if (aspectRatio > MAX_ASPECT_RATIO) {
+            // Too wide, adjust height
+            height = (int) (width / MAX_ASPECT_RATIO);
+            Log.d(TAG, "Adjusting PiP aspect ratio: too wide, clamping to " + MAX_ASPECT_RATIO);
+          }
+          
+          // Set the aspect ratio with potentially adjusted dimensions
+          Rational pipAspectRatio = new Rational(width, height);
+          builder.setAspectRatio(pipAspectRatio);
           
           // Enter PiP mode
           activity.enterPictureInPictureMode(builder.build());
           
-          // Manually trigger PiP entered event since we don't have listeners
+          // Manually trigger PiP entered event
           player.sendPipEnteredEvent();
           return true;
         }
