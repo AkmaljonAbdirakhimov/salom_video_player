@@ -32,6 +32,9 @@ import io.flutter.plugins.videoplayer.platformview.PlatformVideoViewFactory;
 import io.flutter.plugins.videoplayer.platformview.PlatformViewVideoPlayer;
 import io.flutter.plugins.videoplayer.texture.TextureVideoPlayer;
 import io.flutter.view.TextureRegistry;
+import android.app.Application;
+import android.app.Application.ActivityLifecycleCallbacks;
+import android.os.Bundle;
 
 /** Android platform implementation of the VideoPlayerPlugin. */
 public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, ActivityAware {
@@ -42,6 +45,8 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
   private VideoCacheManager cacheManager;
   private Activity activity;
   private boolean pipChangeEventSent = false;
+  private boolean wasInPipMode = false;
+  private ActivityPluginBinding activityBinding;
 
   // TODO(stuartmorgan): Decouple identifiers for platform views and texture views.
   /**
@@ -110,21 +115,94 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
   @Override
   public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
     activity = binding.getActivity();
+    activityBinding = binding;
+    registerPipModeMonitor();
   }
 
   @Override
   public void onDetachedFromActivityForConfigChanges() {
+    unregisterPipModeMonitor();
     activity = null;
+    activityBinding = null;
   }
 
   @Override
   public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
     activity = binding.getActivity();
+    activityBinding = binding;
+    registerPipModeMonitor();
   }
 
   @Override
   public void onDetachedFromActivity() {
+    unregisterPipModeMonitor();
     activity = null;
+    activityBinding = null;
+  }
+
+  private ActivityLifecycleCallbacks pipStateMonitor = null;
+
+  private void registerPipModeMonitor() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity == null) {
+      return;
+    }
+
+    if (pipStateMonitor == null) {
+      pipStateMonitor = new ActivityLifecycleCallbacks() {
+        @Override
+        public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {}
+
+        @Override
+        public void onActivityStarted(@NonNull Activity activity) {}
+
+        @Override
+        public void onActivityResumed(@NonNull Activity activity) {
+          checkPipStateChange();
+        }
+
+        @Override
+        public void onActivityPaused(@NonNull Activity activity) {}
+
+        @Override
+        public void onActivityStopped(@NonNull Activity activity) {}
+
+        @Override
+        public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) {}
+
+        @Override
+        public void onActivityDestroyed(@NonNull Activity activity) {}
+      };
+
+      ((Application) activity.getApplicationContext()).registerActivityLifecycleCallbacks(pipStateMonitor);
+    }
+  }
+
+  private void unregisterPipModeMonitor() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity == null || pipStateMonitor == null) {
+      return;
+    }
+
+    ((Application) activity.getApplicationContext()).unregisterActivityLifecycleCallbacks(pipStateMonitor);
+    pipStateMonitor = null;
+  }
+
+  private void checkPipStateChange() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity == null) {
+      return;
+    }
+
+    boolean isCurrentlyInPipMode = activity.isInPictureInPictureMode();
+    
+    // If we were in PiP mode and now we're not, notify all players
+    if (wasInPipMode && !isCurrentlyInPipMode) {
+      Log.d(TAG, "Exited PiP mode");
+      for (int i = 0; i < videoPlayers.size(); i++) {
+        VideoPlayer player = videoPlayers.valueAt(i);
+        player.sendPipExitedEvent();
+      }
+    }
+    
+    wasInPipMode = isCurrentlyInPipMode;
   }
 
   @Override
@@ -144,17 +222,26 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
   @Override
   public Boolean enterPictureInPictureMode(@NonNull Long playerId) {
     if (activity == null) {
+      Log.w(TAG, "Cannot enter PiP mode: Activity is null");
       return false;
     }
     
     // Only supported on Android 8.0 (API level 26) and higher
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      Log.w(TAG, "Cannot enter PiP mode: Feature requires Android 8.0 or higher");
+      return false;
+    }
+    
+    // Check if activity is in a valid state to enter PiP
+    if (activity.isFinishing() || activity.isDestroyed()) {
+      Log.w(TAG, "Cannot enter PiP mode: Activity is finishing or destroyed");
       return false;
     }
     
     // Get the video player
     VideoPlayer player = getPlayer(playerId);
     if (player == null) {
+      Log.w(TAG, "Cannot enter PiP mode: Player not found for ID: " + playerId);
       return false;
     }
     
@@ -168,6 +255,12 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
         if (videoWidth <= 0 || videoHeight <= 0) {
           Log.w(TAG, "Cannot enter PiP mode: Invalid video dimensions: " + videoWidth + "x" + videoHeight);
           return false;
+        }
+        
+        // Check if we're already in PiP mode
+        if (activity.isInPictureInPictureMode()) {
+          Log.d(TAG, "Already in PiP mode, not re-entering");
+          return true;
         }
         
         PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
@@ -199,21 +292,34 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
         
         // For Android 12 (API 31+), we can set additional properties
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-          // Enable auto PiP when user navigates away while video is playing
-          builder.setAutoEnterEnabled(true)
+          // Disable auto PiP when user navigates away while video is playing
+          // Only enter PiP mode explicitly when requested
+          builder.setAutoEnterEnabled(false)
                 .setSeamlessResizeEnabled(true);
-                
-          // We don't set sourceRectHint since null is default and lets system determine best rect
         }
         
-        // Enter PiP mode with the configured parameters
-        activity.enterPictureInPictureMode(builder.build());
-        
-        // Manually trigger PiP entered event
-        player.sendPipEnteredEvent();
-        return true;
+        // Use try-catch specifically for the PiP entry to better handle lifecycle exceptions
+        try {
+          // Enter PiP mode with the configured parameters
+          PictureInPictureParams params = builder.build();
+          activity.enterPictureInPictureMode(params);
+          
+          // Update our state tracking
+          wasInPipMode = true;
+          
+          // Manually trigger PiP entered event
+          player.sendPipEnteredEvent();
+          return true;
+        } catch (IllegalStateException e) {
+          // This occurs if the activity is not in a valid state for PiP
+          Log.e(TAG, "Activity not in valid state for PiP: " + e.getMessage());
+          return false;
+        } catch (Exception e) {
+          Log.e(TAG, "Error entering PiP mode", e);
+          return false;
+        }
       } catch (Exception e) {
-        Log.e(TAG, "Error entering PiP mode", e);
+        Log.e(TAG, "Error preparing for PiP mode", e);
       }
     }
     

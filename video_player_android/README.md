@@ -36,5 +36,56 @@ override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
 }
 ```
 
+### Avoiding Activity Lifecycle Issues
+
+To prevent errors like "Performing pause of activity that is not resumed", make sure your Activity correctly handles lifecycle transitions with PiP. Add these to your MainActivity:
+
+```java
+// Java
+@Override
+public void onUserLeaveHint() {
+    super.onUserLeaveHint();
+    // This is a good place to automatically enter PiP mode if a video is playing
+}
+
+@Override
+public void onStop() {
+    // Make sure to handle any cleanup before calling super
+    super.onStop();
+}
+
+@Override
+public void onResume() {
+    super.onResume();
+    // Delay any PiP operations to ensure activity is fully resumed
+    new Handler().postDelayed(() -> {
+        // Safe to perform PiP operations here
+    }, 300);
+}
+```
+
+```kotlin
+// Kotlin
+override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    // This is a good place to automatically enter PiP mode if a video is playing
+}
+
+override fun onStop() {
+    // Make sure to handle any cleanup before calling super
+    super.onStop()
+}
+
+override fun onResume() {
+    super.onResume()
+    // Delay any PiP operations to ensure activity is fully resumed
+    Handler().postDelayed({
+        // Safe to perform PiP operations here
+    }, 300)
+}
+```
+
+Also, avoid rapidly toggling PiP mode and ensure you don't call `enterPictureInPictureMode()` during activity transitions.
+
 [1]: https://pub.dev/packages/video_player
 [2]: https://flutter.dev/to/endorsed-federated-plugin

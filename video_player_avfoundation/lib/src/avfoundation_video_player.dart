@@ -168,6 +168,10 @@ class AVFoundationVideoPlayer extends VideoPlayerPlatform {
             eventType: VideoEventType.isPlayingStateUpdate,
             isPlaying: map['isPlaying'] as bool,
           );
+        case 'pipEntered':
+          return VideoEvent(eventType: VideoEventType.pipEntered);
+        case 'pipExited':
+          return VideoEvent(eventType: VideoEventType.pipExited);
         default:
           return VideoEvent(eventType: VideoEventType.unknown);
       }

@@ -925,8 +925,7 @@ class _VideoAppLifeCycleObserver extends Object with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused) {
       // Check if the video is in PiP mode before pausing
       final bool isInPiP = await _controller.isInPictureInPictureMode();
       _wasPlayingBeforePause = _controller.value.isPlaying;
