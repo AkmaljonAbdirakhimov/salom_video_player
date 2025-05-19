@@ -935,9 +935,11 @@ class _VideoAppLifeCycleObserver extends Object with WidgetsBindingObserver {
         _controller.pause();
       }
     } else if (state == AppLifecycleState.resumed) {
-      if (_wasPlayingBeforePause) {
-        _controller.play();
-      }
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        if (_wasPlayingBeforePause) {
+          _controller.play();
+        }
+      });
     }
   }
 

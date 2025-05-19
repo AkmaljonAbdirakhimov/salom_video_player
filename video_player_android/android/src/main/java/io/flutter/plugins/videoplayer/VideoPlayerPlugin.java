@@ -160,65 +160,58 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
     
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       try {
-        // Get the aspect ratio from the video size
-        int width = player.getVideoSize().width;
-        int height = player.getVideoSize().height;
+        // Get the video dimensions
+        int videoWidth = player.getVideoSize().width;
+        int videoHeight = player.getVideoSize().height;
         
         // Only attempt to enter PiP if we have valid video dimensions
-        if (width > 0 && height > 0) {
-          PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-          
-          // Calculate the aspect ratio
-          float aspectRatio = (float) width / height;
-          
-          // Android PiP allowed range is approximately 0.42 to 2.39
-          final float MIN_ASPECT_RATIO = 0.42f;
-          final float MAX_ASPECT_RATIO = 2.39f;
-          
-          // Standard aspect ratios
-          final float ASPECT_RATIO_16_9 = 16f / 9f;  // ~ 1.78
-          final float ASPECT_RATIO_9_16 = 9f / 16f;  // ~ 0.56
-          
-          // Adjust extreme aspect ratios to standard values
-          if (aspectRatio < MIN_ASPECT_RATIO) {
-            // Too narrow, use 9:16 (portrait)
-            Log.d(TAG, "Adjusting PiP aspect ratio: too narrow, using 9:16");
-            width = 9;
-            height = 16;
-          } else if (aspectRatio > MAX_ASPECT_RATIO) {
-            // Too wide, use 16:9 (landscape)
-            Log.d(TAG, "Adjusting PiP aspect ratio: too wide, using 16:9");
-            width = 16;
-            height = 9;
-          } else if (aspectRatio < 1.0f) {
-            // Portrait video within allowed range, but we can optionally standardize to 9:16
-            // if it's close enough to that ratio
-            if (Math.abs(aspectRatio - ASPECT_RATIO_9_16) < 0.15f) {
-              Log.d(TAG, "Standardizing PiP aspect ratio to 9:16");
-              width = 9;
-              height = 16;
-            }
-          } else {
-            // Landscape video within allowed range, but we can optionally standardize to 16:9
-            // if it's close enough to that ratio
-            if (Math.abs(aspectRatio - ASPECT_RATIO_16_9) < 0.3f) {
-              Log.d(TAG, "Standardizing PiP aspect ratio to 16:9");
-              width = 16;
-              height = 9;
-            }
-          }
-          
-          // Set the aspect ratio with potentially adjusted dimensions
-          Rational pipAspectRatio = new Rational(width, height);
-          builder.setAspectRatio(pipAspectRatio);
-          
-          // Enter PiP mode
-          activity.enterPictureInPictureMode(builder.build());
-          
-          // Manually trigger PiP entered event
-          player.sendPipEnteredEvent();
-          return true;
+        if (videoWidth <= 0 || videoHeight <= 0) {
+          Log.w(TAG, "Cannot enter PiP mode: Invalid video dimensions: " + videoWidth + "x" + videoHeight);
+          return false;
         }
+        
+        PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+        
+        // Calculate the aspect ratio
+        float aspectRatio = (float) videoWidth / videoHeight;
+        
+        // Clamp aspect ratio to allowed Android range (roughly 0.42 to 2.39)
+        final float MIN_ASPECT_RATIO = 0.42f;
+        final float MAX_ASPECT_RATIO = 2.39f;
+        
+        int width = videoWidth;
+        int height = videoHeight;
+        
+        // Adjust extreme aspect ratios while trying to maintain as much of the original video as possible
+        if (aspectRatio < MIN_ASPECT_RATIO) {
+          // Too narrow, adjust width to minimum allowed
+          width = (int) (height * MIN_ASPECT_RATIO);
+          Log.d(TAG, "Adjusting PiP aspect ratio: too narrow, clamping to " + MIN_ASPECT_RATIO);
+        } else if (aspectRatio > MAX_ASPECT_RATIO) {
+          // Too wide, adjust height to maximum allowed
+          height = (int) (width / MAX_ASPECT_RATIO);
+          Log.d(TAG, "Adjusting PiP aspect ratio: too wide, clamping to " + MAX_ASPECT_RATIO);
+        }
+        
+        // Set the aspect ratio with potentially adjusted dimensions
+        Rational pipAspectRatio = new Rational(width, height);
+        builder.setAspectRatio(pipAspectRatio);
+        
+        // For Android 12 (API 31+), we can set additional properties
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+          // Enable auto PiP when user navigates away while video is playing
+          builder.setAutoEnterEnabled(true)
+                .setSeamlessResizeEnabled(true);
+                
+          // We don't set sourceRectHint since null is default and lets system determine best rect
+        }
+        
+        // Enter PiP mode with the configured parameters
+        activity.enterPictureInPictureMode(builder.build());
+        
+        // Manually trigger PiP entered event
+        player.sendPipEnteredEvent();
+        return true;
       } catch (Exception e) {
         Log.e(TAG, "Error entering PiP mode", e);
       }
