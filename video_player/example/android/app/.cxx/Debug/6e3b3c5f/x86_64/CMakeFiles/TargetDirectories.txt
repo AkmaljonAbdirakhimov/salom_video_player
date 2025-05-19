@@ -1,0 +1,2 @@
+/Users/Akmaljon/Desktop/Akmaljon/Projects/Flutter/video_player_pip/packages/video_player/video_player/example/android/app/.cxx/Debug/6e3b3c5f/x86_64/CMakeFiles/edit_cache.dir
+/Users/Akmaljon/Desktop/Akmaljon/Projects/Flutter/video_player_pip/packages/video_player/video_player/example/android/app/.cxx/Debug/6e3b3c5f/x86_64/CMakeFiles/rebuild_cache.dir

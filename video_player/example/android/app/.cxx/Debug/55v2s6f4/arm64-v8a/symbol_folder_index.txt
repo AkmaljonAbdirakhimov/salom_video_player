@@ -1,0 +1,1 @@
+/Users/Akmaljon/Desktop/Akmaljon/Projects/Flutter/video_player/video_player/example/build/app/intermediates/cxx/Debug/55v2s6f4/obj/arm64-v8a

@@ -1,0 +1,1 @@
+/Users/Akmaljon/Desktop/Akmaljon/Projects/Flutter/video_player_pip/packages/video_player/video_player/example/build/app/intermediates/cxx/Debug/6e3b3c5f/obj/x86_64

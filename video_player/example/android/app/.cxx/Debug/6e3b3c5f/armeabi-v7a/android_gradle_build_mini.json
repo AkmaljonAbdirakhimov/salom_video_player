@@ -1,0 +1,20 @@
+{
+  "buildFiles": [
+    "/Users/Akmaljon/Desktop/Akmaljon/Programs/flutter/packages/flutter_tools/gradle/src/main/groovy/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/Akmaljon/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/Akmaljon/Desktop/Akmaljon/Projects/Flutter/video_player_pip/packages/video_player/video_player/example/android/app/.cxx/Debug/6e3b3c5f/armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/Akmaljon/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/Akmaljon/Desktop/Akmaljon/Projects/Flutter/video_player_pip/packages/video_player/video_player/example/android/app/.cxx/Debug/6e3b3c5f/armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {}
+}
