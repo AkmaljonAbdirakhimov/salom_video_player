@@ -268,26 +268,22 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
         // Calculate the aspect ratio
         float aspectRatio = (float) videoWidth / videoHeight;
         
-        // Clamp aspect ratio to allowed Android range (roughly 0.42 to 2.39)
-        final float MIN_ASPECT_RATIO = 0.42f;
-        final float MAX_ASPECT_RATIO = 2.39f;
+        // Clamp aspect ratio to allowed Android range - simple approach
+        final float MIN_ASPECT_RATIO = 0.418410f;
+        final float MAX_ASPECT_RATIO = 2.390000f;
         
-        int width = videoWidth;
-        int height = videoHeight;
-        
-        // Adjust extreme aspect ratios while trying to maintain as much of the original video as possible
-        if (aspectRatio < MIN_ASPECT_RATIO) {
-          // Too narrow, adjust width to minimum allowed
-          width = (int) (height * MIN_ASPECT_RATIO);
-          Log.d(TAG, "Adjusting PiP aspect ratio: too narrow, clamping to " + MIN_ASPECT_RATIO);
-        } else if (aspectRatio > MAX_ASPECT_RATIO) {
-          // Too wide, adjust height to maximum allowed
-          height = (int) (width / MAX_ASPECT_RATIO);
-          Log.d(TAG, "Adjusting PiP aspect ratio: too wide, clamping to " + MAX_ASPECT_RATIO);
+        // Simple clamping using Math.min and Math.max
+        float clampedAspectRatio = Math.max(MIN_ASPECT_RATIO, Math.min(aspectRatio, MAX_ASPECT_RATIO));
+        if (clampedAspectRatio != aspectRatio) {
+          Log.d(TAG, "Adjusted PiP aspect ratio from " + aspectRatio + " to " + clampedAspectRatio);
         }
         
-        // Set the aspect ratio with potentially adjusted dimensions
-        Rational pipAspectRatio = new Rational(width, height);
+        // Use a consistent denominator for the Rational
+        int denominator = 1000;
+        int numerator = Math.round(clampedAspectRatio * denominator);
+        
+        // Create the aspect ratio for PiP
+        Rational pipAspectRatio = new Rational(numerator, denominator);
         builder.setAspectRatio(pipAspectRatio);
         
         // For Android 12 (API 31+), we can set additional properties
@@ -619,5 +615,10 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi, 
     void stopListening(BinaryMessenger messenger) {
       AndroidVideoPlayerApi.setUp(messenger, null);
     }
+  }
+
+  // Add this helper method to calculate greatest common divisor (GCD)
+  private int gcd(int a, int b) {
+    return b == 0 ? a : gcd(b, a % b);
   }
 }
